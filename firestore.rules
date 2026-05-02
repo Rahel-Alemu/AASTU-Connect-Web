@@ -1,0 +1,101 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // User Profile Rules
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.keys().hasAll(['uid', 'email', 'balance', 'createdAt']) &&
+               data.keys().size() <= 8 && // Allowing for optional fields like department, college
+               data.uid == request.auth.uid &&
+               data.email is string && data.email.size() <= 100 &&
+               data.balance is number &&
+               data.createdAt is timestamp;
+      }
+
+      allow get: if isSignedIn(); // Students can see each other's basic info (maybe for solver names)
+      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().balance == 100; // Starting bonus
+      allow update: if isOwner(userId) && isValidUser(incoming()) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'department', 'college', 'balance']);
+      
+      // Admin/System internal balance updates would usually happen via cloud functions, 
+      // but here we allow user to update their own balance if they are the owner (simulating payment)
+      // or if they are receiving a reward. In a real app this would be more restricted.
+    }
+
+    // Assignment Rules
+    match /assignments/{assignmentId} {
+      function isValidAssignment(data) {
+        return data.keys().hasAll(['title', 'description', 'department', 'authorId', 'rewardAmount', 'status', 'createdAt']) &&
+               data.title is string && data.title.size() <= 200 &&
+               data.description is string && data.description.size() <= 2000 &&
+               data.authorId == request.auth.uid &&
+               data.rewardAmount is number && data.rewardAmount > 0 &&
+               data.status in ['open', 'solved', 'closed'] &&
+               data.createdAt == request.time;
+      }
+
+      allow list: if isSignedIn(); // Everyone can see the list of questions
+      allow get: if isSignedIn();
+      allow create: if isSignedIn() && isValidAssignment(incoming());
+      allow update: if isSignedIn() && (
+        // Author can close or change status
+        (isOwner(existing().authorId) && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'title', 'description'])) ||
+        // System/Solver marking as solved (simplified for prototype)
+        (incoming().diff(existing()).affectedKeys().hasOnly(['status']))
+      );
+    }
+
+    // Solution Rules (nested)
+    match /assignments/{assignmentId}/solutions/{solutionId} {
+      function isValidSolution(data) {
+        return data.keys().hasAll(['assignmentId', 'solverId', 'content', 'status', 'createdAt']) &&
+               data.assignmentId == assignmentId &&
+               data.solverId == request.auth.uid &&
+               data.content is string && data.content.size() <= 5000 &&
+               data.status in ['pending', 'accepted', 'rejected'] &&
+               data.createdAt == request.time;
+      }
+
+      allow list: if isSignedIn(); 
+      allow get: if isSignedIn(); // In frontend, we will blur content if not "accepted" or paid
+      allow create: if isSignedIn() && isValidSolution(incoming());
+      allow update: if isSignedIn() && (
+        // AI or Author accepting solution
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'aiVerificationResult', 'aiFeedback'])
+      );
+    }
+
+    // Transaction Rules
+    match /transactions/{transactionId} {
+      allow list: if isOwner(resource.data.fromId) || isOwner(resource.data.toId);
+      allow get: if isOwner(resource.data.fromId) || isOwner(resource.data.toId);
+      allow create: if isSignedIn() && incoming().fromId == request.auth.uid;
+    }
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Authenticated student profile with department and balance info.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "department": { "type": "string" },
+        "college": { "type": "string", "enum": ["Engineering", "Applied"] },
+        "balance": { "type": "number", "description": "Current balance in Birr" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "balance"]
+    },
+    "Assignment": {
+      "title": "Assignment Question",
+      "description": "A question posted by a student for help.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "imageUrl": { "type": "string", "description": "Optional URL to image of drawing or model" },
+        "department": { "type": "string" },
+        "college": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "rewardAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["open", "solved", "closed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "department", "authorId", "rewardAmount", "status"]
+    },
+    "Solution": {
+      "title": "Assignment Solution",
+      "description": "A proposed solution to an assignment.",
+      "type": "object",
+      "properties": {
+        "assignmentId": { "type": "string" },
+        "solverId": { "type": "string" },
+        "solverName": { "type": "string" },
+        "content": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "aiVerificationResult": { "type": "string", "description": "Verification status from Gemini (Correct, Incorrect, Unclear)" },
+        "aiFeedback": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "accepted", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["assignmentId", "solverId", "content", "status"]
+    },
+    "Transaction": {
+      "title": "Financial Transaction",
+      "description": "Record of payments for solutions.",
+      "type": "object",
+      "properties": {
+        "amount": { "type": "number" },
+        "fromId": { "type": "string" },
+        "toId": { "type": "string" },
+        "assignmentId": { "type": "string" },
+        "type": { "type": "string", "enum": ["payment", "reward", "deposit"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["amount", "fromId", "toId", "type", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Student profiles"
+    },
+    "/assignments/{assignmentId}": {
+      "schema": "Assignment",
+      "description": "Posted questions"
+    },
+    "/assignments/{assignmentId}/solutions/{solutionId}": {
+      "schema": "Solution",
+      "description": "Proposed answers for a specific question"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Payment history"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "AASTU Connect",
+  "description": "A collaborative platform for AASTU students to share assignments, provide solutions, and get rewards. Features department-specific categories and AI-powered answer verification.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "multi-user",
+    "ai-verification",
+    "payments"
+  ]
+}
